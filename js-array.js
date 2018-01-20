@@ -4,10 +4,9 @@
  *
  */
 
-({define:typeof define!="undefined"?define:function(deps, factory){module.exports = factory(exports, require("./parser"), require("./query"), require("./util/each"), require("./util/contains"));}}).
-define(["exports", "./parser", "./query", "./util/each", "./util/contains"], function(exports, parser, QUERY, each, contains){
-//({define:typeof define!="undefined"?define:function(deps, factory){module.exports = factory(exports, require("./parser"));}}).
-//define(["exports", "./parser"], function(exports, parser){
+const parser = require('./parser');
+const each = require('./util/each');
+const contains = require('./util/contains');
 
 var parseQuery = parser.parseQuery;
 var stringify = typeof JSON !== "undefined" && JSON.stringify || function(str){
@@ -423,5 +422,3 @@ function throwMaxIterations(){
 	throw new Error("Query has taken too much computation, and the user is not allowed to execute resource-intense queries. Increase maxIterations in your config file to allow longer running non-indexed queries to be processed.");
 }
 exports.maxIterations = 10000;
-return exports;
-});

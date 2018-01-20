@@ -1,10 +1,22 @@
-define(function (require) {
-	var test = require('intern!object'),
-		assert = require('intern/chai!assert'),
-		Query = require('../query').Query,
-		parseQuery = require('../parser').parseQuery,
-		JSON = require('intern/dojo/json'),
-		supportsDateString = !isNaN(new Date('2009')),
+const { Query } = require('../query');
+const { parseQuery } = require('../parser');
+
+function hasKeys(it) {
+	var key;
+
+	if (it == null || typeof it !== 'object') {
+		return false;
+	}
+
+	for (key in it) {
+		if (it.hasOwnProperty(key)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+const supportsDateString = !isNaN(new Date('2009')),
 		queryPairs = {
 			arrays: {
 				a: { name: 'and', args: [ 'a' ]},
@@ -122,123 +134,87 @@ define(function (require) {
 					{ name: 'or', args: [{ name: 'eq', args: [ 'e', 'f' ]}, { name: 'eq', args: [ 'g', 1 ]}]}
 				]}
 			}
-		},
-		testParsing = (function () {
-			var tests = {},
-				test,
-				group,
-				pairs,
-				key;
+		};
 
-			for (group in queryPairs) {
-				tests[ group ] = test = {};
-				pairs = queryPairs [ group ];
-				for (key in pairs) {
-					// Wrap the test function in another function call so
-					// that the keys and pairs objects are correctly bound
-					var f = function (k, p) {
-						return function () {
-							// skip tests which don't have an expected value
-							if (!p[ k ]) {
-								return this.skip();
-							}
+		test('parsing', () => {
+			for (let group in queryPairs) {
+				const pairs = queryPairs [ group ];
+				for (let key in pairs) {
+					let expected = pairs[key];
 
-							var actual = parseQuery(k),
-								expected = p[ k ];
+					// skip tests which don't have an expected value
+					if (!expected) {
+						continue;
+					}
 
-							if (!hasKeys(actual.cache)) {
-								delete actual.cache;
-							}
+					const actual = parseQuery(key);
 
-							if (typeof expected === 'string') {
-								expected = parseQuery(expected);
-							}
+					if (!hasKeys(actual.cache)) {
+						delete actual.cache;
+					}
 
-							if (!hasKeys(expected.cache)) {
-								delete expected.cache;
-							}
+					if (typeof expected === 'string') {
+						expected = parseQuery(expected);
+					}
 
-							// someone decided that matching constructors is necessary for deep equality
-							// see https://github.com/theintern/intern/issues/284
-							// the deepEqual assertion also fails due to properties like toString so this assertion seems to
-							// be the most suitable.
-							assert.strictEqual(JSON.stringify(actual), JSON.stringify(expected));
-						};
-					};
-					test[ key ] = f(key, pairs);
+					if (!hasKeys(expected.cache)) {
+						delete expected.cache;
+					}
+
+					// someone decided that matching constructors is necessary for deep equality
+					// see https://github.com/theintern/intern/issues/284
+					// the deepEqual assertion also fails due to properties like toString so this assertion seems to
+					// be the most suitable.
+					expect(actual).toEqual(expected); //assert.strictEqual(JSON.stringify(actual), JSON.stringify(expected));
 				}
 			}
+		});
 
-			return tests;
-		})();
-
-	function hasKeys(it) {
-		var key;
-
-		if (it == null || typeof it !== 'object') {
-			return false;
-		}
-
-		for (key in it) {
-			if (it.hasOwnProperty(key)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	test({
-		name: 'rql/test/query',
-
-		testBehavior: function () {
+		test('behavior', () => {
 			//assert.error(parseQuery(), "parseQuery requires a string");
-			assert.ok(parseQuery('') instanceof Query, 'should inherit from Query');
-			assert.ok(parseQuery('a=b') instanceof Query, 'should inherit from Query');
+			expect(parseQuery('')).toBeInstanceOf(Query);
+			expect(parseQuery('a=b')).toBeInstanceOf(Query);
 			//assert.error(parseQuery('?a=b'), 'cannot begin with a ?');
-		},
+		});
 
-		testParsing: testParsing,
-
-		testBindParameters: function () {
+		test('bind parameters', () => {
 			// TODO
 			var parsed;
 			parsed = parseQuery('in(id,$1)', [['a','b','c']]);
-			assert.strictEqual(JSON.stringify(parsed), JSON.stringify({
+			expect(parsed).toEqual({
 				name: 'and',
 				args: [{ name: 'in', args: [ 'id', [ 'a', 'b', 'c' ]]}],
 				cache: {}
-			}));
+			});
 			parsed = parseQuery('eq(id,$1)', [ 'a' ]);
-			assert.deepEqual(JSON.stringify(parsed), JSON.stringify({
+			expect(parsed).toEqual({
 				name: 'and',
 				args: [{ name: 'eq', args: ['id', 'a']}],
 				cache: {id: 'a'}
-			}));
-		},
+			});
+		});
 
-		testStringification: function () {
+		test('stringification', () => {
 			// TODO
 			var parsed;
 			parsed = parseQuery('eq(id1,RE:%5Eabc%5C%2F)');
 			// Hmmm. deepEqual gives null for regexps?
-			assert.ok(parsed.args[0].args[1].toString() === /^abc\//.toString());
+			expect(parsed.args[0].args[1].toString()).toBe(/^abc\//.toString());
 			//assert.deepEqual(parsed, {name: 'and', args: [{name: 'eq', args: ['id1', /^abc\//]}]});
-			assert.ok(new Query().eq('_1',/GGG(EE|FF)/i) + '' === 'eq(_1,re:GGG%28EE%7CFF%29)');
+			expect(new Query().eq('_1',/GGG(EE|FF)/i) + '').toBe('eq(_1,re:GGG%28EE%7CFF%29)');
 			parsed = parseQuery('eq(_1,re:GGG%28EE%7CFF%29)');
-			console.log(parsed.args[0].args[1].toString() === /GGG(EE|FF)/i.toString());
+			expect(parsed.args[0].args[1].toString()).toBe(/GGG(EE|FF)/i.toString());
 			//assert.ok(Query().eq('_1',/GGG(EE|FF)/)+'' === 'eq(_1,RE:GGG%28EE%7CFF%29)');
 			// string to array and back
 			var str = 'somefunc(and(1),(a,b),(10,(10,1)),(a,b.c))';
-			assert.equal(parseQuery(str) + '', str);
+			expect(parseQuery(str) + '').toBe(str);
 			// quirky arguments
 			var name = ['a/b','c.d'];
-			assert.equal(parseQuery(new Query().eq(name,1) + '') + '', 'eq((a%2Fb,c.d),1)');
-			assert.deepEqual(parseQuery(new Query().eq(name,1) + '').args[0].args[0], name);
-		},
+			expect(parseQuery(new Query().eq(name,1) + '') + '').toBe('eq((a%2Fb,c.d),1)');
+			expect(parseQuery(new Query().eq(name,1) + '').args[0].args[0]).toEqual(name);
+		});
 
-		testMatches: function () {
+		test('matches', () => {
 			var query = new Query().match('name', /Will*/);
-			assert.equal('' + query, 'match(name,RE:Will*)');
-		}
-	});
-});
+			expect('' + query).toBe('match(name,RE:Will*)');
+		});

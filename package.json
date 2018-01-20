@@ -26,7 +26,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "http://github.com/kriszyp/rql"
+    "url": "http://github.com/TeamPraxis/rql"
   },
   "maintainers": [
     {
@@ -34,21 +34,16 @@
       "email": "kriszyp@gmail.com"
     }
   ],
-  "mappings": {
-    "patr": "http://github.com/kriszyp/patr/zipball/v0.2.1",
-    "promised-io": "http://github.com/kriszyp/promised-io/zipball/v0.2.1"
-  },
-  "dependencies": {
-    "promised-io": ">=0.3.0"
-  },
   "devDependencies": {
-    "intern-geezer": "^2.1.1"
+    "jest": "^22.1.4"
   },
   "scripts": {
-    "test": "intern-client config=test/intern",
-    "test.sauce": "intern-runner config=test/intern",
-    "test.proxy": "intern-runner config=test/intern --proxyOnly"
+    "test": "jest"
   },
   "icon": "http://packages.dojofoundation.org/images/persvr.png",
-  "dojoBuild": "package.js"
+  "jest": {
+    "collectCoverage": true,
+    "testRegex": "/test/.*\\.js$",
+    "verbose": true
+  }
 }

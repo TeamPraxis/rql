@@ -9,17 +9,17 @@
  *	 // for each object that matches the query
  * });
  */
-//({define:typeof define!="undefined"?define:function(deps, factory){module.exports = factory(exports, require("./parser"), require("./js-array"));}}).
-//define(["exports", "./parser", "./js-array"], function(exports, parser, jsarray){
-({define:typeof define!="undefined"?define:function(deps, factory){module.exports = factory(exports, require("./parser"), require("./util/each"));}}).
-define(["exports", "./parser", "./util/each"], function(exports, parser, each){
+const parser = require('./parser');
+const each = require('./util/each');
 
 var parseQuery = parser.parseQuery;
-try{
-	var when = require("promised-io/promise").when;
-}catch(e){
-	when = function(value, callback){callback(value)};
-}
+
+const when = (value, resolvedCallback, rejectCallback) => {
+	if(value instanceof Promise){
+		return value.then(resolvedCallback, rejectCallback);
+	}
+	return resolvedCallback ? resolvedCallback(value) : value;
+};
 
 parser.Query = function(seed, params){
 	if (typeof seed === 'string')
@@ -266,6 +266,3 @@ Query.prototype.toMongo = function(options){
 	});
 };
 */
-
-return exports;
-});
