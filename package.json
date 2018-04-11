@@ -21,9 +21,6 @@
       "url": "http://trac.dojotoolkit.org/browser/dojo/trunk/LICENSE#L13"
     }
   ],
-  "directories": {
-    "lib": "."
-  },
   "repository": {
     "type": "git",
     "url": "http://github.com/TeamPraxis/rql"
@@ -53,5 +50,6 @@
   },
   "engines": {
     "node": ">=6.0.0"
-  }
+  },
+  "main": "index.js"
 }

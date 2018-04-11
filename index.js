@@ -1,8 +1,9 @@
 const { Query } = require('./query');
-const { parseQuery, parseGently } = require('./parser');
+const { parseQuery } = require('./parser');
+const { executeQuery } = require('./js-array');
 
 module.exports = {
 	Query,
 	parseQuery,
-	parseGently
+	executeQuery
 };
