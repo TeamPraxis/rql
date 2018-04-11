@@ -9,10 +9,9 @@
  *	 // for each object that matches the query
  * });
  */
-const parser = require('./parser');
+//const parser = require('./parser');
+const converters = require('./converters');
 const each = require('./util/each');
-
-var parseQuery = parser.parseQuery;
 
 const when = (value, resolvedCallback, rejectCallback) => {
 	if(value instanceof Promise){
@@ -21,121 +20,134 @@ const when = (value, resolvedCallback, rejectCallback) => {
 	return resolvedCallback ? resolvedCallback(value) : value;
 };
 
-parser.Query = function(seed, params){
-	if (typeof seed === 'string')
-		return parseQuery(seed, params);
-	var q = new Query();
-	if (seed && seed.name && seed.args)
+const Query = function (name) {
+	this.name = name || "and";
+	this.args = [];
+}
+
+// replace the Query constructor used in the parser module
+/*parser.Query = function (seed, params){
+	if (typeof seed === 'string') {
+		return parser.parseQuery(seed, params);
+	}
+	const q = new Query();
+	if (seed && seed.name && seed.args) {
 		q.name = seed.name, q.args = seed.args;
+	}
 	return q;
-};
-exports.Query = parser.Query;
+};*/
+
+exports.Query = Query;
+
 //TODO:THE RIGHT WAY IS:exports.knownOperators = Object.keys(jsarray.operators || {}).concat(Object.keys(jsarray.jsOperatorMap || {}));
 exports.knownOperators = ["sort", "match", "in", "out", "or", "and", "select", "contains", "excludes", "values", "limit", "distinct", "recurse", "aggregate", "between", "sum", "mean", "max", "min", "count", "first", "one", "eq", "ne", "le", "ge", "lt", "gt"];
 exports.knownScalarOperators = ["mean", "sum", "min", "max", "count", "first", "one"];
 exports.arrayMethods = ["forEach", "reduce", "map", "filter", "indexOf", "some", "every"];
 
-function Query(name){
-	this.name = name || "and";
-	this.args = [];
+const encodeString = (s) => {
+	if (typeof s === "string") {
+		s = encodeURIComponent(s);
+		if (s.match(/[()]/)) {
+			s = s.replace("(","%28").replace(")","%29");
+		}
+	}
+	return s;
 }
-function serializeArgs(array, delimiter){
-	var results = [];
-	for(var i = 0, l = array.length; i < l; i++){
+
+const queryToString = (part) => {
+	if (part instanceof Array) {
+		return '(' + serializeArgs(part, ",")+')';
+	}
+	if (part && part.name && part.args) {
+		return [
+			part.name,
+			"(",
+			serializeArgs(part.args, ","),
+			")"
+		].join("");
+	}
+	return exports.encodeValue(part);
+};
+
+
+const serializeArgs = (array, delimiter) => {
+	const results = [];
+	for(let i = 0, l = array.length; i < l; i++){
 		results.push(queryToString(array[i]));
 	}
 	return results.join(delimiter);
-}
-exports.Query.prototype = Query.prototype;
-Query.prototype.toString = function(){
+};
+
+Query.prototype.toString = function () {
 	return this.name === "and" ?
 		serializeArgs(this.args, "&") :
 		queryToString(this);
 };
 
-function queryToString(part) {
-		if (part instanceof Array) {
-				return '(' + serializeArgs(part, ",")+')';
+exports.encodeValue = (val) => {
+	let encoded;
+	if (val === null) {
+		val = 'null';
+	}
+
+	const valStr = '' + (val.toISOString && val.toISOString() || val.toString());
+	if (val !== converters.default(valStr)) {
+		let type = typeof val;
+		if(val instanceof RegExp){
+			// TODO: control whether to we want simpler glob() style
+			val = val.toString();
+			const i = val.lastIndexOf('/');
+			type = val.substring(i).indexOf('i') >= 0 ? "re" : "RE";
+			val = encodeString(val.substring(1, i));
+			encoded = true;
 		}
-		if (part && part.name && part.args) {
-				return [
-						part.name,
-						"(",
-						serializeArgs(part.args, ","),
-						")"
-				].join("");
+		if(type === "object"){
+			type = "epoch";
+			val = val.getTime();
+			encoded = true;
 		}
-		return exports.encodeValue(part);
+		if(type === "string") {
+			val = encodeString(val);
+			encoded = true;
+		}
+		val = [type, val].join(":");
+	}
+
+	if (!encoded && typeof val === "string") {
+		val = encodeString(val);
+	}
+
+	return val;
 };
 
-function encodeString(s) {
-		if (typeof s === "string") {
-				s = encodeURIComponent(s);
-				if (s.match(/[\(\)]/)) {
-						s = s.replace("(","%28").replace(")","%29");
-				};
-		}
-		return s;
-}
-
-exports.encodeValue = function(val) {
-		var encoded;
-		if (val === null) val = 'null';
-		if (val !== parser.converters["default"]('' + (
-				val.toISOString && val.toISOString() || val.toString()
-		))) {
-				var type = typeof val;
-				if(val instanceof RegExp){
-					// TODO: control whether to we want simpler glob() style
-					val = val.toString();
-					var i = val.lastIndexOf('/');
-					type = val.substring(i).indexOf('i') >= 0 ? "re" : "RE";
-					val = encodeString(val.substring(1, i));
-					encoded = true;
-				}
-				if(type === "object"){
-						type = "epoch";
-						val = val.getTime();
-						encoded = true;
-				}
-				if(type === "string") {
-						val = encodeString(val);
-						encoded = true;
-				}
-				val = [type, val].join(":");
-		}
-		if (!encoded && typeof val === "string") val = encodeString(val);
-		return val;
-};
-
-exports.updateQueryMethods = function(){
-	each(exports.knownOperators, function(name){
-		Query.prototype[name] = function(){
-			var newQuery = new Query();
+exports.updateQueryMethods = () => {
+	each(exports.knownOperators, (name) => {
+		Query.prototype[name] = function () {
+			const newQuery = new Query();
 			newQuery.executor = this.executor;
-			var newTerm = new Query(name);
+			const newTerm = new Query(name);
 			newTerm.args = Array.prototype.slice.call(arguments);
 			newQuery.args = this.args.concat([newTerm]);
 			return newQuery;
 		};
 	});
-	each(exports.knownScalarOperators, function(name){
-		Query.prototype[name] = function(){
-			var newQuery = new Query();
+	each(exports.knownScalarOperators, (name) => {
+		Query.prototype[name] = function () {
+			const newQuery = new Query();
 			newQuery.executor = this.executor;
-			var newTerm = new Query(name);
+			const newTerm = new Query(name);
 			newTerm.args = Array.prototype.slice.call(arguments);
 			newQuery.args = this.args.concat([newTerm]);
 			return newQuery.executor(newQuery);
 		};
 	});
-	each(exports.arrayMethods, function(name){
+	each(exports.arrayMethods, (name) => {
 		// this makes no guarantee of ensuring that results supports these methods
-		Query.prototype[name] = function(){
-			var args = arguments;
-			return when(this.executor(this), function(results){
-				return results[name].apply(results, args);
-			});
+		Query.prototype[name] = function () {
+			const args = arguments;
+			return when(this.executor(this), results =>
+				results[name].apply(results, args)
+			);
 		};
 	});
 
@@ -144,25 +156,17 @@ exports.updateQueryMethods = function(){
 exports.updateQueryMethods();
 
 /* recursively iterate over query terms calling 'fn' for each term */
-Query.prototype.walk = function(fn, options){
-	options = options || {};
-	function walk(name, terms){
+Query.prototype.walk = function (fn) {
+	const walk = function (name, terms) {
 		terms = terms || [];
-
-		var i = 0,
-			l = terms.length,
-			term,
-			args,
-			func,
-			newTerm;
-
-		for (; i < l; i++) {
-			term = terms[i];
+		const l = terms.length;
+		for (let i = 0; i < l; i++) {
+			let term = terms[i];
 			if (term == null) {
 				term = {};
 			}
-			func = term.name;
-			args = term.args;
+			const func = term.name;
+			const args = term.args;
 			if (!func || !args) {
 				continue;
 			}
@@ -170,7 +174,7 @@ Query.prototype.walk = function(fn, options){
 				walk.call(this, func, args);
 			}
 			else {
-				newTerm = fn.call(this, func, args);
+				const newTerm = fn.call(this, func, args);
 				if (newTerm && newTerm.name && newTerm.ags) {
 					terms[i] = newTerm;
 				}
@@ -181,51 +185,50 @@ Query.prototype.walk = function(fn, options){
 };
 
 /* append a new term */
-Query.prototype.push = function(term){
+Query.prototype.push = function (term) {
 	this.args.push(term);
 	return this;
 };
 
 /* disambiguate query */
-Query.prototype.normalize = function(options){
+Query.prototype.normalize = function (options) {
 	options = options || {};
 	options.primaryKey = options.primaryKey || 'id';
 	options.map = options.map || {};
-	var result = {
+	const result = {
 		original: this,
 		sort: [],
 		limit: [Infinity, 0, Infinity],
 		skip: 0,
-		limit: Infinity,
 		select: [],
 		values: false
 	};
-	var plusMinus = {
+	const plusMinus = {
 		// [plus, minus]
 		sort: [1, -1],
 		select: [1, 0]
 	};
-	function normal(func, args){
+	const normal = (func, args) => {
 		// cache some parameters
 		if (func === 'sort' || func === 'select') {
 			result[func] = args;
-			var pm = plusMinus[func];
-			result[func+'Arr'] = result[func].map(function(x){
+			const pm = plusMinus[func];
+			result[func+'Arr'] = result[func].map((x) => {
 				if (x instanceof Array) x = x.join('.');
-				var o = {};
-				var a = /([-+]*)(.+)/.exec(x);
+				const o = {};
+				const a = /([-+]*)(.+)/.exec(x);
 				o[a[2]] = pm[(a[1].charAt(0) === '-')*1];
 				return o;
 			});
 			result[func+'Obj'] = {};
-			result[func].forEach(function(x){
+			result[func].forEach((x) => {
 				if (x instanceof Array) x = x.join('.');
-				var a = /([-+]*)(.+)/.exec(x);
+				const a = /([-+]*)(.+)/.exec(x);
 				result[func+'Obj'][a[2]] = pm[(a[1].charAt(0) === '-')*1];
 			});
 		} else if (func === 'limit') {
 			// validate limit() args to be numbers, with sane defaults
-			var limit = args;
+			let limit = args;
 			result.skip = +limit[1] || 0;
 			limit = +limit[0] || 0;
 			if (options.hardLimit && limit > options.hardLimit)
@@ -237,7 +240,7 @@ Query.prototype.normalize = function(options){
 			result.values = true;
 		} else if (func === 'eq') {
 			// cache primary key equality -- useful to distinguish between .get(id) and .query(query)
-			var t = typeof args[1];
+			const t = typeof args[1];
 			//if ((args[0] instanceof Array ? args[0][args[0].length-1] : args[0]) === options.primaryKey && ['string','number'].indexOf(t) >= 0) {
 			if (args[0] === options.primaryKey && ('string' === t || 'number' === t)) {
 				result.pk = String(args[1]);

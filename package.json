@@ -35,15 +35,23 @@
     }
   ],
   "devDependencies": {
-    "jest": "^22.1.4"
+    "eslint": "^4.19.1",
+    "eslint-plugin-jest": "^21.15.0",
+    "eslint-plugin-node": "^6.0.1",
+    "eslint-plugin-promise": "^3.7.0",
+    "jest": "^22.4.3"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "lint": "eslint ."
   },
   "icon": "http://packages.dojofoundation.org/images/persvr.png",
   "jest": {
     "collectCoverage": true,
     "testRegex": "/test/.*\\.js$",
     "verbose": true
+  },
+  "engines": {
+    "node": ">=6.0.0"
   }
 }

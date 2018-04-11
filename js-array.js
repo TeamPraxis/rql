@@ -8,36 +8,37 @@ const parser = require('./parser');
 const each = require('./util/each');
 const contains = require('./util/contains');
 
-var parseQuery = parser.parseQuery;
-var stringify = typeof JSON !== "undefined" && JSON.stringify || function(str){
-	return '"' + str.replace(/"/g, "\\\"") + '"';
-};
-var nextId = 1;
+const { parseQuery } = parser;
+const { stringify } = JSON;
+
+let nextId = 1;
 exports.jsOperatorMap = {
-	"eq" : "===",
-	"ne" : "!==",
-	"le" : "<=",
-	"ge" : ">=",
-	"lt" : "<",
-	"gt" : ">"
+	'eq' : '===',
+	'ne' : '!==',
+	'le' : '<=',
+	'ge' : '>=',
+	'lt' : '<',
+	'gt' : '>'
 };
+
 exports.operators = {
 	sort: function(){
-		var terms = [];
-		for(var i = 0; i < arguments.length; i++){
-			var sortAttribute = arguments[i];
-			var firstChar = sortAttribute.charAt(0);
-			var term = {attribute: sortAttribute, ascending: true};
+		const terms = [];
+		for(let i = 0; i < arguments.length; i++){
+			const sortAttribute = arguments[i];
+			const firstChar = sortAttribute.charAt(0);
+			const term = {attribute: sortAttribute, ascending: true};
 			if (firstChar == "-" || firstChar == "+") {
-				if(firstChar == "-"){
+				if (firstChar == "-") {
 					term.ascending = false;
 				}
 				term.attribute = term.attribute.substring(1);
 			}
 			terms.push(term);
 		}
-		this.sort(function(a, b){
-			for (var term, i = 0; term = terms[i]; i++) {
+		this.sort((a, b) => {
+			for (let i = 0; i < terms.length; i++) {
+				const term = terms[i];
 				if (a[term.attribute] != b[term.attribute]) {
 					return term.ascending == a[term.attribute] > b[term.attribute] ? 1 : -1;
 				}
@@ -66,23 +67,22 @@ exports.operators = {
 		}
 	}),
 	excludes: filter(function(array, value){
-		if(typeof value == "function"){
+		if (typeof value == "function") {
 			return !each(array, function(v){
 				return value.call([v]).length;
 			});
-		}
-		else{
+		} else {
 			return !contains(array, value);
 		}
 	}),
 	or: function(){
-		var items = [];
-		var idProperty = "__rqlId" + nextId++;
+		const items = [];
+		const idProperty = "__rqlId" + nextId++;
 		try{
-			for(var i = 0; i < arguments.length; i++){
-				var group = arguments[i].call(this);
-				for(var j = 0, l = group.length;j < l;j++){
-					var item = group[j];
+			for(let i = 0; i < arguments.length; i++){
+				const group = arguments[i].call(this);
+				for(let j = 0, l = group.length;j < l;j++){
+					const item = group[j];
 					// use marker to do a union in linear time.
 					if(!item[idProperty]){
 						item[idProperty] = true;
@@ -92,28 +92,28 @@ exports.operators = {
 			}
 		}finally{
 			// cleanup markers
-			for(var i = 0, l = items.length; i < l; i++){
+			for(let i = 0, l = items.length; i < l; i++){
 				delete items[idProperty];
 			}
 		}
 		return items;
 	},
 	and: function(){
-		var items = this;
+		let items = this;
 		// TODO: use condition property
-		for(var i = 0; i < arguments.length; i++){
+		for(let i = 0; i < arguments.length; i++){
 			items = arguments[i].call(items);
 		}
 		return items;
 	},
 	select: function(){
-		var args = arguments;
-		var argc = arguments.length;
+		const args = arguments;
+		const argc = arguments.length;
 		return each(this, function(object, emit){
-			var selected = {};
-			for(var i = 0; i < argc; i++){
-				var propertyName = args[i];
-				var value = evaluateProperty(object, propertyName);
+			const selected = {};
+			for(let i = 0; i < argc; i++){
+				const propertyName = args[i];
+				const value = evaluateProperty(object, propertyName);
 				if(typeof value != "undefined"){
 					selected[propertyName] = value;
 				}
@@ -122,14 +122,14 @@ exports.operators = {
 		});
 	},
 	unselect: function(){
-		var args = arguments;
-		var argc = arguments.length;
+		const args = arguments;
+		const argc = arguments.length;
 		return each(this, function(object, emit){
-			var selected = {};
-			for (var i in object) if (object.hasOwnProperty(i)) {
+			const selected = {};
+			for (const i in object) if (object.hasOwnProperty(i)) {
 				selected[i] = object[i];
 			}
-			for(var i = 0; i < argc; i++) {
+			for (let i = 0; i < argc; i++) {
 				delete selected[args[i]];
 			}
 			emit(selected);
@@ -141,17 +141,17 @@ exports.operators = {
 				emit(object[first]);
 			});
 		}
-		var args = arguments;
-		var argc = arguments.length;
+		const args = arguments;
+		const argc = arguments.length;
 		return each(this, function(object, emit){
-			var selected = [];
+			const selected = [];
 			if (argc === 0) {
-				for(var i in object) if (object.hasOwnProperty(i)) {
+				for(const i in object) if (object.hasOwnProperty(i)) {
 					selected.push(object[i]);
 				}
 			} else {
-				for(var i = 0; i < argc; i++){
-					var propertyName = args[i];
+				for(let i = 0; i < argc; i++){
+					const propertyName = args[i];
 					selected.push(object[propertyName]);
 				}
 			}
@@ -159,9 +159,9 @@ exports.operators = {
 		});
 	},
 	limit: function(limit, start, maxCount){
-		var totalCount = this.length;
+		const totalCount = this.length;
 		start = start || 0;
-		var sliced = this.slice(start, start + limit);
+		const sliced = this.slice(start, start + limit);
 		if(maxCount){
 			sliced.start = start;
 			sliced.end = start + sliced.length - 1;
@@ -170,9 +170,9 @@ exports.operators = {
 		return sliced;
 	},
 	distinct: function(){
-		var primitives = {};
-		var needCleaning = [];
-		var newResults = this.filter(function(value){
+		const primitives = {};
+		const needCleaning = [];
+		const newResults = this.filter(function(value){
 			if(value && typeof value == "object"){
 				if(!value.__found__){
 					value.__found__ = function(){};// get ignored by JSON serialization
@@ -193,7 +193,7 @@ exports.operators = {
 	},
 	recurse: function(property){
 		// TODO: this needs to use lazy-array
-		var newResults = [];
+		const newResults = [];
 		function recurse(value){
 			if(value instanceof Array){
 				each(value, recurse);
@@ -205,7 +205,7 @@ exports.operators = {
 						recurse(value);
 					}
 				}else{
-					for(var i in value){
+					for(const i in value){
 						if(value[i] && typeof value[i] == "object"){
 							recurse(value[i]);
 						}
@@ -217,40 +217,40 @@ exports.operators = {
 		return newResults;
 	},
 	aggregate: function(){
-		var distinctives = [];
-		var aggregates = [];
-		for(var i = 0; i < arguments.length; i++){
-			var arg = arguments[i];
+		const distinctives = [];
+		const aggregates = [];
+		for(let i = 0; i < arguments.length; i++){
+			const arg = arguments[i];
 			if(typeof arg === "function"){
-				 aggregates.push(arg);
+				aggregates.push(arg);
 			}else{
 				distinctives.push(arg);
 			}
 		}
-		var distinctObjects = {};
-		var dl = distinctives.length;
+		const distinctObjects = {};
+		const dl = distinctives.length;
 		each(this, function(object){
-			var key = "";
-			for(var i = 0; i < dl;i++){
+			let key = "";
+			for(let i = 0; i < dl;i++){
 				key += '/' + object[distinctives[i]];
 			}
-			var arrayForKey = distinctObjects[key];
+			let arrayForKey = distinctObjects[key];
 			if(!arrayForKey){
 				arrayForKey = distinctObjects[key] = [];
 			}
 			arrayForKey.push(object);
 		});
-		var al = aggregates.length;
-		var newResults = [];
-		for(var key in distinctObjects){
-			var arrayForKey = distinctObjects[key];
-			var newObject = {};
-			for(var i = 0; i < dl;i++){
-				var property = distinctives[i];
+		const al = aggregates.length;
+		const newResults = [];
+		for (const key in distinctObjects) {
+			const arrayForKey = distinctObjects[key];
+			const newObject = {};
+			for(let i = 0; i < dl; i++){
+				const property = distinctives[i];
 				newObject[property] = arrayForKey[0][property];
 			}
-			for(var i = 0; i < al;i++){
-				var aggregate = aggregates[i];
+			for(let i = 0; i < al; i++){
+				const aggregate = aggregates[i];
 				newObject[i] = aggregate.call(arrayForKey);
 			}
 			newResults.push(newObject);
@@ -286,17 +286,16 @@ exports.operators = {
 	}
 };
 exports.filter = filter;
-function filter(condition, not){
+function filter(condition) {
 	// convert to boolean right now
-	var filter = function(property, second){
+	const filter = function (property, second){
 		if(typeof second == "undefined"){
 			second = property;
 			property = undefined;
 		}
-		var args = arguments;
-		var filtered = [];
-		for(var i = 0, length = this.length; i < length; i++){
-			var item = this[i];
+		const filtered = [];
+		for(let i = 0, length = this.length; i < length; i++){
+			const item = this[i];
 			if(condition(evaluateProperty(item, property), second)){
 				filtered.push(item);
 			}
@@ -305,17 +304,17 @@ function filter(condition, not){
 	};
 	filter.condition = condition;
 	return filter;
-};
-function reducer(func){
-	return function(property){
-		var result = this[0];
+}
+function reducer(func) {
+	return function(property) {
+		let result = this[0];
 		if(property){
 			result = result && result[property];
-			for(var i = 1, l = this.length; i < l; i++) {
+			for(let i = 1, l = this.length; i < l; i++) {
 				result = func(result, this[i][property]);
 			}
-		}else{
-			for(var i = 1, l = this.length; i < l; i++) {
+		} else {
+			for(let i = 1, l = this.length; i < l; i++) {
 				result = func(result, this[i]);
 			}
 		}
@@ -334,17 +333,20 @@ function evaluateProperty(object, property){
 	}else{
 		return object[decodeURIComponent(property)];
 	}
-};
-var conditionEvaluator = exports.conditionEvaluator = function(condition){
-	var jsOperator = exports.jsOperatorMap[term.name];
-	if(jsOperator){
-		js += "(function(item){return item." + term[0] + jsOperator + "parameters[" + (index -1) + "][1];});";
-	}
-	else{
-		js += "operators['" + term.name + "']";
-	}
-	return eval(js);
-};
+}
+
+// exports.conditionEvaluator = function () {
+//	let js = "";
+//	const jsOperator = exports.jsOperatorMap[term.name];
+//	if(jsOperator){
+//		js += "(function(item){return item." + term[0] + jsOperator + "parameters[" + (index -1) + "][1];});";
+//	}
+//	else{
+//		js += "operators['" + term.name + "']";
+//	}
+//	return eval(js);
+// };
+
 exports.executeQuery = function(query, options, target){
 	return exports.query(query, options, target);
 }
@@ -352,21 +354,23 @@ exports.query = query;
 exports.missingOperator = function(operator){
 	throw new Error("Operator " + operator + " is not defined");
 }
-function query(query, options, target){
+function query(query, options, target) {
 	options = options || {};
 	query = parseQuery(query, options.parameters);
-	function t(){}
+
+	const t = function () {}
 	t.prototype = exports.operators;
-	var operators = new t;
+	const operators = new t();
+
 	// inherit from exports.operators
-	for(var i in options.operators){
+	for(const i in options.operators){
 		operators[i] = options.operators[i];
 	}
+	// used in stringified function below
+	// eslint-disable-next-line
 	function op(name){
 		return operators[name]||exports.missingOperator(name);
 	}
-	var parameters = options.parameters || [];
-	var js = "";
 	function queryToJS(value){
 		if(value && typeof value === "object" && !(value instanceof RegExp)){
 			if(value instanceof Array){
@@ -374,26 +378,27 @@ function query(query, options, target){
 					emit(queryToJS(value));
 				}) + ']';
 			}else{
-				var jsOperator = exports.jsOperatorMap[value.name];
+				const jsOperator = exports.jsOperatorMap[value.name];
 				if(jsOperator){
 					// item['foo.bar'] ==> (item && item.foo && item.foo.bar && ...)
-					var path = value.args[0];
-					var target = value.args[1];
+					const path = value.args[0];
+					let target = value.args[1];
+					let item;
 					if (typeof target == "undefined"){
-						var item = "item";
+						item = "item";
 						target = path;
 					}else if(path instanceof Array){
-						var item = "item";
-						var escaped = [];
-						for(var i = 0;i < path.length; i++){
+						item = "item";
+						const escaped = [];
+						for(let i = 0;i < path.length; i++){
 							escaped.push(stringify(path[i]));
 							item +="&&item[" + escaped.join("][") + ']';
 						}
 					}else{
-						var item = "item&&item[" + stringify(path) + "]";
+						item = "item&&item[" + stringify(path) + "]";
 					}
 					// use native Array.prototype.filter if available
-					var condition = item + jsOperator + queryToJS(target);
+					const condition = item + jsOperator + queryToJS(target);
 					if (typeof Array.prototype.filter === 'function') {
 						return "(function(){return this.filter(function(item){return " + condition + "})})";
 						//???return "this.filter(function(item){return " + condition + "})";
@@ -405,20 +410,21 @@ function query(query, options, target){
 						return value.valueOf();
 					}
 					return "(function(){return op('" + value.name + "').call(this" +
-						(value && value.args && value.args.length > 0 ? (", " + each(value.args, function(value, emit){
+						(value && value.args && value.args.length > 0
+							? (", " + each(value.args, function(value, emit){
 								emit(queryToJS(value));
-							}).join(",")) : "") +
+							}).join(","))
+							: ""
+						) +
 						")})";
 				}
 			}
-		}else{
+		} else {
 			return typeof value === "string" ? stringify(value) : value;
 		}
 	}
-	var evaluator = eval("(1&&function(target){return " + queryToJS(query) + ".call(target);})");
+	const evaluator = eval("(1&&function(target){return " + queryToJS(query) + ".call(target);})");
 	return target ? evaluator(target) : evaluator;
 }
-function throwMaxIterations(){
-	throw new Error("Query has taken too much computation, and the user is not allowed to execute resource-intense queries. Increase maxIterations in your config file to allow longer running non-indexed queries to be processed.");
-}
+
 exports.maxIterations = 10000;

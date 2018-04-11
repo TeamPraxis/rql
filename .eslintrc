@@ -1,0 +1,22 @@
+{
+  "extends": [
+    "eslint:recommended",
+    "plugin:node/recommended",
+    "plugin:promise/recommended"
+  ],
+  "plugins": [
+    "node",
+    "promise"
+  ],
+  "rules": {
+     "no-tabs": 0,
+     "semi": 0,
+     "indent": ["error", "tab"],
+     "prefer-const": "error",
+     "no-var": "error"
+  },
+  "env": {
+    "node": true,
+    "es6": true
+  }
+}

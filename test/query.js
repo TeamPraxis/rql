@@ -199,9 +199,9 @@ const supportsDateString = !isNaN(new Date('2009')),
   };
 
 test('parsing', () => {
-  for (let group in queryPairs) {
+  for (const group in queryPairs) {
     const pairs = queryPairs[group];
-    for (let key in pairs) {
+    for (const key in pairs) {
       let expected = pairs[key];
 
       // skip tests which don't have an expected value

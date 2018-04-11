@@ -1,0 +1,19 @@
+{
+  "extends": [
+    "eslint:recommended",
+    "plugin:jest/recommended",
+    "plugin:node/recommended",
+    "plugin:promise/recommended"
+  ],
+  "plugins": [
+    "jest",
+    "node",
+    "promise"
+  ],
+  "rules": {
+    "semi": 0,
+    "indent": ["error", 2],
+     "prefer-const": "error",
+     "no-var": "error"
+  }
+}
