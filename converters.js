@@ -8,6 +8,7 @@ const autoConverted = {
 };
 
 const converters = {
+	jsonQueryCompatible: true,
 	auto(string) {
 		if(autoConverted.hasOwnProperty(string)){
 			return autoConverted[string];
@@ -19,7 +20,7 @@ const converters = {
 			//	date = new Date(Date.UTC(+isoDate[1], +isoDate[2] - 1, +isoDate[3], +isoDate[4], +isoDate[5], +isoDate[6], +isoDate[7] || 0));
 			// }
 			string = decodeURIComponent(string);
-			if(exports.jsonQueryCompatible){
+			if(this.jsonQueryCompatible){
 				if(string.charAt(0) == "'" && string.charAt(string.length-1) == "'"){
 					return JSON.parse('"' + string.substring(1,string.length-1) + '"');
 				}
@@ -47,7 +48,7 @@ const converters = {
 		let date = '0000'.substr(0,4-x.length)+x;
 		// pattern for partial dates
 		date += '0000-01-01T00:00:00Z'.substring(date.length);
-		return exports.converters.date(date);
+		return this.date(date);
 	},
 	date(x) {
 		const isoDate = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z$/.exec(x);
@@ -62,7 +63,7 @@ const converters = {
 		}
 		return date;
 	},
-	boolean(x){
+	boolean(x) {
 		return x === "true";
 	},
 	string(string) {

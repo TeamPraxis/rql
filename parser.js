@@ -19,7 +19,6 @@ const operatorMap = {
 // exported to be configurable
 exports.primaryKeyName = 'id';
 exports.lastSeen = ['sort', 'select', 'values', 'limit'];
-exports.jsonQueryCompatible = true;
 
 const stringToValue = (string, parameters) => {
 	let converter = converters.default;
@@ -65,7 +64,7 @@ const parse = (/*String|Object*/query, parameters) => {
 		throw new URIError('Query must not start with ?');
 	}
 
-	if (exports.jsonQueryCompatible) {
+	if (converters.jsonQueryCompatible) {
 		query = query.replace(/%3C=/g,'=le=').replace(/%3E=/g,'=ge=').replace(/%3C/g,'=lt=').replace(/%3E/g,'=gt=');
 	}
 
