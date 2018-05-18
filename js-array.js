@@ -4,11 +4,10 @@
  *
  */
 
-const parser = require('./parser');
+const { parseQuery } = require('./parser');
 const each = require('./util/each');
 const contains = require('./util/contains');
 
-const { parseQuery } = parser;
 const { stringify } = JSON;
 
 let nextId = 1;
@@ -22,7 +21,7 @@ exports.jsOperatorMap = {
 };
 
 exports.operators = {
-	sort: function(){
+	sort() {
 		const terms = [];
 		for(let i = 0; i < arguments.length; i++){
 			const sortAttribute = arguments[i];
@@ -75,7 +74,7 @@ exports.operators = {
 			return !contains(array, value);
 		}
 	}),
-	or: function(){
+	or() {
 		const items = [];
 		const idProperty = "__rqlId" + nextId++;
 		try{
@@ -98,7 +97,7 @@ exports.operators = {
 		}
 		return items;
 	},
-	and: function(){
+	and() {
 		let items = this;
 		// TODO: use condition property
 		for(let i = 0; i < arguments.length; i++){
@@ -106,7 +105,7 @@ exports.operators = {
 		}
 		return items;
 	},
-	select: function(){
+	select() {
 		const args = arguments;
 		const argc = arguments.length;
 		return each(this, function(object, emit){
@@ -121,7 +120,7 @@ exports.operators = {
 			emit(selected);
 		});
 	},
-	unselect: function(){
+	unselect() {
 		const args = arguments;
 		const argc = arguments.length;
 		return each(this, function(object, emit){
@@ -135,7 +134,7 @@ exports.operators = {
 			emit(selected);
 		});
 	},
-	values: function(first){
+	values(first) {
 		if(arguments.length == 1){
 			return each(this, function(object, emit){
 				emit(object[first]);
@@ -158,7 +157,7 @@ exports.operators = {
 			emit(selected);
 		});
 	},
-	limit: function(limit, start, maxCount){
+	limit(limit, start, maxCount) {
 		const totalCount = this.length;
 		start = start || 0;
 		const sliced = this.slice(start, start + limit);
@@ -169,7 +168,7 @@ exports.operators = {
 		}
 		return sliced;
 	},
-	distinct: function(){
+	distinct() {
 		const primitives = {};
 		const needCleaning = [];
 		const newResults = this.filter(function(value){
@@ -186,37 +185,37 @@ exports.operators = {
 				}
 			}
 		});
-		each(needCleaning, function(object){
+		needCleaning.forEach((object) => {
 			delete object.__found__;
 		});
 		return newResults;
 	},
-	recurse: function(property){
+	recurse(property) {
 		// TODO: this needs to use lazy-array
 		const newResults = [];
-		function recurse(value){
-			if(value instanceof Array){
-				each(value, recurse);
-			}else{
+		const doRecurse = (value) => {
+			if (value instanceof Array){
+				value.forEach(doRecurse);
+			} else {
 				newResults.push(value);
-				if(property){
+				if (property) {
 					value = value[property];
-					if(value && typeof value == "object"){
-						recurse(value);
+					if (value && typeof value == "object") {
+						doRecurse(value);
 					}
-				}else{
-					for(const i in value){
+				} else {
+					for (const i in value) {
 						if(value[i] && typeof value[i] == "object"){
-							recurse(value[i]);
+							doRecurse(value[i]);
 						}
 					}
 				}
 			}
-		}
-		recurse(this);
+		};
+		doRecurse(this);
 		return newResults;
 	},
-	aggregate: function(){
+	aggregate() {
 		const distinctives = [];
 		const aggregates = [];
 		for(let i = 0; i < arguments.length; i++){
@@ -229,7 +228,7 @@ exports.operators = {
 		}
 		const distinctObjects = {};
 		const dl = distinctives.length;
-		each(this, function(object){
+		this.forEach((object) => {
 			let key = "";
 			for(let i = 0; i < dl;i++){
 				key += '/' + object[distinctives[i]];
@@ -263,8 +262,8 @@ exports.operators = {
 	sum: reducer(function(a, b){
 		return a + b;
 	}),
-	mean: function(property){
-		return exports.operators.sum.call(this, property)/this.length;
+	mean(property) {
+		return this.sum(property)/this.length;
 	},
 	max: reducer(function(a, b){
 		return Math.max(a, b);
@@ -272,19 +271,20 @@ exports.operators = {
 	min: reducer(function(a, b){
 		return Math.min(a, b);
 	}),
-	count: function(){
+	count() {
 		return this.length;
 	},
-	first: function(){
+	first() {
 		return this[0];
 	},
-	one: function(){
+	one() {
 		if(this.length > 1){
 			throw new TypeError("More than one object found");
 		}
 		return this[0];
 	}
 };
+
 exports.filter = filter;
 function filter(condition) {
 	// convert to boolean right now
@@ -324,7 +324,7 @@ function reducer(func) {
 exports.evaluateProperty = evaluateProperty;
 function evaluateProperty(object, property){
 	if(property instanceof Array){
-		each(property, function(part){
+		property.forEach((part) => {
 			object = object[decodeURIComponent(part)];
 		});
 		return object;
@@ -354,8 +354,7 @@ exports.query = query;
 exports.missingOperator = function(operator){
 	throw new Error("Operator " + operator + " is not defined");
 }
-function query(query, options, target) {
-	options = options || {};
+function query(query, options = {}, target) {
 	query = parseQuery(query, options.parameters);
 
 	const t = function () {}

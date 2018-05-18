@@ -9,9 +9,7 @@
  *	 // for each object that matches the query
  * });
  */
-//const parser = require('./parser');
 const converters = require('./converters');
-const each = require('./util/each');
 
 const when = (value, resolvedCallback, rejectCallback) => {
 	if(value instanceof Promise){
@@ -19,25 +17,6 @@ const when = (value, resolvedCallback, rejectCallback) => {
 	}
 	return resolvedCallback ? resolvedCallback(value) : value;
 };
-
-const Query = function (name) {
-	this.name = name || "and";
-	this.args = [];
-}
-
-// replace the Query constructor used in the parser module
-/*parser.Query = function (seed, params){
-	if (typeof seed === 'string') {
-		return parser.parseQuery(seed, params);
-	}
-	const q = new Query();
-	if (seed && seed.name && seed.args) {
-		q.name = seed.name, q.args = seed.args;
-	}
-	return q;
-};*/
-
-exports.Query = Query;
 
 //TODO:THE RIGHT WAY IS:exports.knownOperators = Object.keys(jsarray.operators || {}).concat(Object.keys(jsarray.jsOperatorMap || {}));
 exports.knownOperators = ["sort", "match", "in", "out", "or", "and", "select", "contains", "excludes", "values", "limit", "distinct", "recurse", "aggregate", "between", "sum", "mean", "max", "min", "count", "first", "one", "eq", "ne", "le", "ge", "lt", "gt"];
@@ -78,12 +57,6 @@ const serializeArgs = (array, delimiter) => {
 	return results.join(delimiter);
 };
 
-Query.prototype.toString = function () {
-	return this.name === "and" ?
-		serializeArgs(this.args, "&") :
-		queryToString(this);
-};
-
 exports.encodeValue = (val) => {
 	let encoded;
 	if (val === null) {
@@ -120,45 +93,32 @@ exports.encodeValue = (val) => {
 	return val;
 };
 
-exports.updateQueryMethods = () => {
-	each(exports.knownOperators, (name) => {
-		Query.prototype[name] = function () {
-			const newQuery = new Query();
-			newQuery.executor = this.executor;
-			const newTerm = new Query(name);
-			newTerm.args = Array.prototype.slice.call(arguments);
-			newQuery.args = this.args.concat([newTerm]);
-			return newQuery;
-		};
-	});
-	each(exports.knownScalarOperators, (name) => {
-		Query.prototype[name] = function () {
-			const newQuery = new Query();
-			newQuery.executor = this.executor;
-			const newTerm = new Query(name);
-			newTerm.args = Array.prototype.slice.call(arguments);
-			newQuery.args = this.args.concat([newTerm]);
-			return newQuery.executor(newQuery);
-		};
-	});
-	each(exports.arrayMethods, (name) => {
-		// this makes no guarantee of ensuring that results supports these methods
-		Query.prototype[name] = function () {
-			const args = arguments;
-			return when(this.executor(this), results =>
-				results[name].apply(results, args)
-			);
-		};
-	});
-
+const newQueryForOperator = (oldQuery, name, args) => {
+	const newQuery = new Query();
+	newQuery.executor = oldQuery.executor;
+	const newTerm = new Query(name);
+	newTerm.args = args;
+	newQuery.args = oldQuery.args.concat([newTerm]);
+	return newQuery;
 };
 
-exports.updateQueryMethods();
+/* eslint-disable indent */
+class Query {
+
+constructor (name) {
+	this.name = name || "and";
+	this.args = [];
+}
+
+toString() {
+	return this.name === "and" ?
+		serializeArgs(this.args, "&") :
+		queryToString(this);
+}
 
 /* recursively iterate over query terms calling 'fn' for each term */
-Query.prototype.walk = function (fn) {
-	const walk = function (name, terms) {
-		terms = terms || [];
+walk(fn) {
+	const recWalk = (name, terms = []) => {
 		const l = terms.length;
 		for (let i = 0; i < l; i++) {
 			let term = terms[i];
@@ -171,7 +131,7 @@ Query.prototype.walk = function (fn) {
 				continue;
 			}
 			if (args[0] instanceof Query) {
-				walk.call(this, func, args);
+				recWalk(func, args);
 			}
 			else {
 				const newTerm = fn.call(this, func, args);
@@ -181,18 +141,17 @@ Query.prototype.walk = function (fn) {
 			}
 		}
 	}
-	walk.call(this, this.name, this.args);
-};
+	recWalk(this.name, this.args);
+}
 
 /* append a new term */
-Query.prototype.push = function (term) {
+push(term) {
 	this.args.push(term);
 	return this;
-};
+}
 
 /* disambiguate query */
-Query.prototype.normalize = function (options) {
-	options = options || {};
+normalize(options = {}) {
 	options.primaryKey = options.primaryKey || 'id';
 	options.map = options.map || {};
 	const result = {
@@ -255,7 +214,44 @@ Query.prototype.normalize = function (options) {
 	}
 	this.walk(normal);
 	return result;
+}
+}
+/* eslint-enable indent */
+
+const createKnownOperatorFn = (name) => {
+	return function () {
+		return newQueryForOperator(this, name, arguments);
+	};
 };
+
+const createKnownScalarOperatorFn = (name) => {
+	return function () {
+		const newQuery = newQueryForOperator(this, name, arguments);
+		return newQuery.executor(newQuery);
+	};
+};
+
+exports.updateQueryMethods = () => {
+	exports.knownOperators.forEach((name) => {
+		Query.prototype[name] = createKnownOperatorFn(name);
+	});
+	exports.knownScalarOperators.forEach((name) => {
+		Query.prototype[name] = createKnownScalarOperatorFn(name);
+	});
+	exports.arrayMethods.forEach((name) => {
+		// this makes no guarantee of ensuring that results supports these methods
+		Query.prototype[name] = function () {
+			const args = arguments;
+			return when(this.executor(this), results =>
+				results[name].apply(results, args)
+			);
+		};
+	});
+};
+
+exports.updateQueryMethods();
+
+exports.Query = Query;
 
 /* FIXME: an example will be welcome
 Query.prototype.toMongo = function(options){
